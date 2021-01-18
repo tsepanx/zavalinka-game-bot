@@ -2,7 +2,7 @@ from enum import Enum, auto
 import random
 from collections import defaultdict
 
-from telegram import Update, ReplyKeyboardMarkup, Chat, Poll
+from telegram import Update, ReplyKeyboardMarkup, Chat, Poll, ForceReply
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, \
     CallbackContext, ConversationHandler, PollAnswerHandler, PollHandler
 
@@ -63,11 +63,15 @@ class Bot:
             update.effective_chat.id,
             'When everybody has finished answering, type /vote to start vote.'
         )
-        context.bot.send_message(update.effective_chat.id, f'First word: {self.controller.get_current_word(room_id)}')
+        context.bot.send_message(
+            update.effective_chat.id,
+            f'First word: {self.controller.get_current_word(room_id)}',
+        )
         for user_id in self.controller.get_users_in_room(room_id):
             sent_message = context.bot.send_message(
                 user_id,
-                f'First word: {self.controller.get_current_word(room_id)}'
+                f'First word: {self.controller.get_current_word(room_id)}',
+                reply_markup=ForceReply(),
             )
             self.controller.add_user_question_message_id(room_id, user_id, sent_message.message_id)
         return Bot.State.WAIT_ANS
@@ -147,11 +151,15 @@ class Bot:
             update.effective_chat.id,
             'When everybody has finished answering, type /vote to start vote.'
         )
-        context.bot.send_message(update.effective_chat.id, f'Next word: {self.controller.get_current_word(room_id)}')
+        context.bot.send_message(
+            update.effective_chat.id,
+            f'Next word: {self.controller.get_current_word(room_id)}',
+        )
         for user_id in self.controller.get_users_in_room(room_id):
             sent_message = context.bot.send_message(
                 user_id,
-                f'Next word: {self.controller.get_current_word(room_id)}'
+                f'Next word: {self.controller.get_current_word(room_id)}',
+                reply_markup=ForceReply(),
             )
             self.controller.add_user_question_message_id(room_id, user_id, sent_message.message_id)
         return Bot.State.WAIT_ANS
@@ -161,7 +169,7 @@ class Bot:
         return ConversationHandler.END
 
     def receive_description_from_user(self, update: Update, context: CallbackContext) -> None:
-        if update.effective_chat.type != Chat.PRIVATE:
+        if not update.message.reply_to_message:
             return
         room_id = self.controller.get_room_id_by_private_message_id(
             update.effective_user.id,
@@ -179,7 +187,7 @@ class Bot:
             chat_id = room_id_to_chat_id(room_id)
             context.bot.send_message(
                 chat_id,
-                "All participants have published their answers, you can safely type /vote now."
+                "All participants have published their answers, you can safely type /vote now.",
             )
 
     def start(self):
@@ -204,7 +212,7 @@ class Bot:
             allow_reentry=True,
         ))
         dispatcher.add_handler(PollAnswerHandler(self.vote_poll_answer))
-        dispatcher.add_handler(MessageHandler(Filters.reply, self.receive_description_from_user))
+        dispatcher.add_handler(MessageHandler(Filters.chat_type.private, self.receive_description_from_user))
 
         updater.start_polling()
 
